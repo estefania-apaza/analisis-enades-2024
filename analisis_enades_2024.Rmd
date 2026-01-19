@@ -1,0 +1,221 @@
+---
+title: 'Percepciones de desigualdad económica y oportunidades en el Perú: un análisis
+  con ENADES 2024'
+author: "Estefanía Apaza"
+date: '2025'
+output:
+  html_document: default
+---
+
+```{r}
+library(rio)
+library(dplyr)
+library(ggplot2)
+
+data <- import("OXFAM_IEP_ENADES_2024.dta")
+```
+
+```{r}
+# Filtro la data primero
+data_chi <- data %>%
+  filter(
+    P07 %in% c(1, 2, 3, 4),
+    P08 %in% c(1, 2, 3),
+    P09 %in% c(1, 2, 3, 4)
+    )
+```
+
+## Estrategia analítica
+
+El análisis emplea pruebas de independencia chi-cuadrado para evaluar la existencia de asociaciones entre la percepción de desigualdad económica y distintas dimensiones de percepción social. 
+
+Este se realizó sobre una base de datos depurada de la ENADES 2024, considerando únicamente casos con información válida en todas las variables de interés. Las respuestas No sabe / No precisa (NS/NP) fueron excluidas con el objetivo de garantizar la comparabilidad entre pruebas y el cumplimiento de los supuestos estadísticos de la prueba chi-cuadrado. Asimismo, se aplican recodificaciones conceptuales orientadas a contrastar percepciones altas versus bajas de desigualdad, lo que facilita la interpretación sustantiva de los resultados y asegura tamaños muestrales adecuados por categoría.
+
+```{r}
+nrow(data_chi)
+```
+
+**El análisis se realizó sobre N=1421 observaciones válidas.**
+
+## Primera prueba
+
+Esta primera prueba examina la asociación entre la percepción de la desigualdad económica en el Perú y la valoración de la importancia del lugar de origen durante la niñez e infancia para el acceso a mejores oportunidades en la vida adulta. 
+
+El interés analítico radica en identificar si distintas percepciones sobre la desigualdad se relacionan con concepciones diferenciadas sobre el peso de los factores territoriales en la movilidad social.
+
+### Recodificación de variables
+
+**Variable independiente P07:¿Qué tan desigual cree que es el Perú económicamente?** 
+
+Las categorías de percepción de desigualdad económica fueron recodificadas en niveles altos y bajos con el fin de facilitar la interpretación analítica y asegurar tamaños muestrales suficientes en cada celda de la tabla de contingencia.
+
+```{r}
+data_chi$percepcion_desigualdad <- factor(
+  data_chi$P07, levels = c(1, 2, 3, 4),
+  labels = c("Alta", "Alta", "Baja", "Baja")
+  )
+
+table(data_chi$percepcion_desigualdad)
+```
+
+**Variable dependiente P09: En su opinión, ¿qué tan importante es el lugar donde una persona vive en su niñez e infancia para que tenga mejores oportunidades en su vida?**
+
+```{r}
+data_chi$importancia_origen <- factor(data_chi$P09, levels = c(1, 2, 3, 4), labels = c("Nada importante", "Poco importante", "Algo importante", "Muy importante"))
+
+table(data_chi$importancia_origen)
+```
+
+### Tabla de contingencia
+
+```{r}
+tabla_origen=table(
+  data_chi$importancia_origen,
+  data_chi$percepcion_desigualdad
+  )
+print(tabla_origen)
+```
+
+### Prueba Chi2
+
+**Expected** 
+
+```{r}
+chisq.test(tabla_origen)$expected
+```
+Todos los valores son mayores a 5, por lo que la prueba de chi cuadrado cumple con el supuesto de validez.
+
+**Hipótesis y prueba**
+
+Hipótesis nula: La percepción de la importancia del lugar de origen durante la niñez para el acceso a oportunidades futuras es estadísticamente independiente de la percepción de desigualdad económica en el Perú.
+
+Hipótesis alternativa: Existe una asociación estadísticamente significativa entre la percepción de desigualdad económica en el Perú y la valoración del lugar de origen durante la niñez como factor para el acceso a oportunidades futuras.
+
+```{r}
+chisq.test(tabla_origen)
+```
+Reporte: Debido a que el p-value es menor a 0.05, se **rechaza** la hipotesis nula. Por lo tanto, se concluye que **sí hay asociación estadística** entre la percepción de desigualdad económica en el Perú y la valoración del lugar de origen en la niñez como factor de oportunidades futuras.
+
+### ¿Cómo se relacionan las variables?
+
+```{r}
+tabla_origen_pct=tabla_origen%>%
+  prop.table(2)%>%
+  round(3)*100
+print(tabla_origen_pct)
+```
+
+Reporte: En ambos grupos de percepción sobre la desigualdad económica, la mayoría considera que el lugar de origen es muy importante en la determinación de las oportunidades futuras (61.3% y 59.4% respectivamente).
+
+### Gráfico de barras apiladas
+
+```{r}
+tabla_origen_pct=as.data.frame(tabla_origen_pct)
+```
+
+```{r}
+ggplot(data = tabla_origen_pct, aes(x = Var2, y = Freq, fill = Var1)) +
+  geom_bar(position = "stack", stat = "identity") +
+  geom_text(aes(label = paste0(round(Freq, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            color = "white", size = 3, fontface = "bold") +
+  scale_fill_manual(values = c("#f7b7c3", "#c5a3ff", "#ffb347", "#a7e0c9", "#f9d162", "#b3d1ff")) +
+  labs(
+    x = "Percepción de desigualdad económica",
+    y = "Porcentaje (%)", 
+    fill = "Importancia del lugar de origen",
+    title = "Percepción de desigualdad económica e importancia del lugar de origen") +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(face = "bold"), panel.grid.minor = element_blank())
+```
+
+**Interpretación**
+
+Si bien la prueba estadística indica la existencia de una asociación significativa entre ambas variables, las diferencias observadas entre los grupos son de magnitud reducida. En ambos niveles de percepción de desigualdad económica, una proporción mayoritaria considera que el lugar de origen durante la infancia es “muy importante” para las oportunidades futuras.
+
+Este patrón sugiere la presencia de una percepción ampliamente compartida sobre el rol estructural del territorio y el entorno en la reproducción de desigualdades, independientemente de cómo se perciba el nivel de desigualdad económica del país. En ese sentido, el lugar de origen parece constituir un componente importante en la explicación de las oportunidades.
+
+## Segunda prueba
+
+La segunda prueba analiza la asociación entre la percepción de desigualdad económica y la evaluación de la evolución reciente de la brecha entre ricos y pobres en el país.
+
+Esta comparación permite indagar en si quienes perciben distintos niveles de desigualdad económica interpretan de manera diferenciada los cambios recientes en dicha brecha.
+
+### Recodificación de variables
+
+**Variable dependiente P08:En los últimos dos años, ¿cree que la diferencia entre ricos y pobres en el Perú…?** 
+
+```{r}
+data_chi$percepcion_brecha <- factor(data_chi$P08, levels = c(1, 2, 3), labels = c("Ha aumentado", "Se mantiene igual", "Ha disminuido"))
+
+table(data_chi$percepcion_brecha)
+```
+
+### Tabla de contingencia
+
+```{r}
+tabla_brecha=table(data_chi$percepcion_brecha,data_chi$percepcion_desigualdad )
+print(tabla_brecha)
+```
+
+### Prueba Chi2
+
+**Expected** 
+
+```{r}
+chisq.test(tabla_brecha)$expected
+```
+Reporte: Todos los valores son mayores a 5, por lo que la prueba de chi cuadrado cumple con el supuesto de validez.
+
+**Hipótesis y prueba**
+
+Hipótesis nula: La percepción sobre la evolución reciente de la brecha entre ricos y pobres en el Perú es estadísticamente independiente de la percepción de desigualdad económica en el país.
+
+Hipótesis alternativa: Existe una asociación estadísticamente significativa entre la percepción de desigualdad económica en el Perú y la percepción sobre la evolución reciente de la brecha entre ricos y pobres.
+
+```{r}
+chisq.test(tabla_brecha)
+```
+
+Reporte: Debido a que el p-value es menor a 0.05, se **rechaza** la hipotesis nula. Por lo tanto, se concluye que **sí existe asociación estadística** entre la percepción de desigualdad económica en el Perú y la percepción sobre la evolución reciente de la brecha entre ricos y pobres.
+
+### ¿Cómo se relacionan las variables?
+
+```{r}
+tabla_brecha_pct=tabla_brecha%>%
+  prop.table(2)%>%
+  round(3)*100
+print(tabla_brecha_pct)
+```
+
+Reporte: Dentro de ambos grupos la mayoría considera que la brecha ha aumentado en los últimos dos años. Aunque, extrañamente, esto es más frecuente entre quienes creen que el país es poco o nada desigual económicamente que quienes creen que lo es mucho o algo (64.5% y 55.4%, respectivamente). 
+
+### Gráfico de barras apiladas
+
+```{r}
+tabla_brecha_pct=as.data.frame(tabla_brecha_pct)
+```
+
+```{r}
+ggplot(data = tabla_brecha_pct, aes(x = Var2, y = Freq, fill = Var1)) +
+  geom_bar(position = "stack", stat = "identity") +
+  geom_text(aes(label = paste0(round(Freq, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            color = "white", size = 3, fontface = "bold") +
+  scale_fill_manual(values = c("#f7b7c3", "#c5a3ff", "#ffb347", "#a7e0c9", "#f9d162", "#b3d1ff")) +
+  labs(x = "Percepción de desigualdad económica",
+       y = "Porcentaje (%)", fill = "Percepción de evolución de brecha económica",
+       title = "Percepción de desigualdad económica y su evolución en los últimos dos años") +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(face = "bold"), panel.grid.minor = element_blank())
+```
+
+**Interpretación**
+
+Los resultados muestran una asociación estadísticamente significativa entre ambas variables; sin embargo, la relación observada no sigue un patrón lineal. En ambos grupos predomina la percepción de que la brecha entre ricos y pobres ha aumentado en los últimos dos años. No obstante, esta percepción es más frecuente entre quienes consideran que el Perú es poco o nada desigual, en comparación con quienes perciben altos niveles de desigualdad.
+
+Este hallazgo sugiere una posible normalización de la desigualdad entre quienes no la perciben como estructuralmente elevada, lo que podría llevar a interpretar los aumentos recientes de la brecha como fenómenos coyunturales más que como parte de un problema persistente. En contraste, quienes perciben una alta desigualdad parecen distribuir sus respuestas de manera más diversa, incluyendo en mayor medida la percepción de una reducción de la brecha, lo que podría reflejar expectativas diferenciadas o interpretaciones más complejas del contexto socioeconómico reciente.
+
+## Consideraciones finales
+
+Es importante mencionar que si bien las asociaciones son estadísticamente significativas, los resultados no determinan relaciones causales. Además,la recodificación de categorías, si bien facilita la interpretación, implica una simplificación analítica que debe ser considerada al interpretar los hallazgos.
